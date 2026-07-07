@@ -11,7 +11,6 @@ import { useAppInfo } from '../../../../features/AppInfo';
 import { useConfiguration } from '../../../../features/Configuration';
 import { useTracking } from '../../../../features/Tracking';
 import { useEnterprise } from '../../../../hooks/useEnterprise';
-import { useFetchClient } from '../../../../hooks/useFetchClient';
 import { useRBAC } from '../../../../hooks/useRBAC';
 import { selectAdminPermissions } from '../../../../selectors';
 
@@ -28,7 +27,6 @@ const AIUageDataCE = () => null;
 const ApplicationInfoPage = () => {
   const { trackUsage } = useTracking();
   const { formatMessage } = useIntl();
-  const { get } = useFetchClient();
   const { logos: serverLogos, updateProjectSettings } = useConfiguration('ApplicationInfoPage');
   const [logos, setLogos] = React.useState({ menu: serverLogos.menu, auth: serverLogos.auth });
   const { settings } = useSelector(selectAdminPermissions);
@@ -185,6 +183,8 @@ const ApplicationInfoPage = () => {
                         <Link
                           href={`https://github.com/strapi/strapi/releases/tag/${latestStrapiReleaseTag}`}
                           endIcon={<ExternalLink />}
+                          target="_blank"
+                          rel="noopener noreferrer"
                         >
                           {formatMessage({
                             id: 'Settings.application.link-upgrade',
@@ -212,7 +212,11 @@ const ApplicationInfoPage = () => {
                           { communityEdition }
                         )}
                       </Typography>
-                      <Link href="https://strapi.io/pricing-self-hosted" endIcon={<ExternalLink />}>
+                      <Link
+                        href="https://strapi.io/pricing-self-hosted"
+                        endIcon={<ExternalLink />}
+                        target="_blank"
+                      >
                         {formatMessage({
                           id: 'Settings.application.link-pricing',
                           defaultMessage: 'See all pricing plans',

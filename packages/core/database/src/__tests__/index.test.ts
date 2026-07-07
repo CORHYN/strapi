@@ -201,6 +201,57 @@ describe('Database', () => {
 
         await db.destroy();
       });
+
+      it(`should not call commit on transactor already finalised (avoid double finalisation) with ${title}`, async () => {
+        const db = new Database(config);
+        await db.init({ models });
+
+        const commitSpy = jest.fn();
+        const trx = {
+          commit: commitSpy,
+          rollback: jest.fn(),
+          isCompleted: () => true,
+        };
+        const transactionOverride = jest.fn(async () => trx);
+        Object.defineProperty(db.connection, 'transaction', {
+          value: transactionOverride,
+          configurable: true,
+        });
+
+        const result = await db.transaction(async () => 'ok');
+        expect(result).toBe('ok');
+        expect(commitSpy).toHaveBeenCalledTimes(0);
+
+        await db.destroy();
+      });
+
+      it(`should not call rollback on transactor already finalised (avoid double finalisation) with ${title}`, async () => {
+        const db = new Database(config);
+        await db.init({ models });
+
+        const rollbackSpy = jest.fn();
+        const trx = {
+          commit: jest.fn(),
+          rollback: rollbackSpy,
+          isCompleted: () => true,
+        };
+        const transactionOverride = jest.fn(async () => trx);
+        Object.defineProperty(db.connection, 'transaction', {
+          value: transactionOverride,
+          configurable: true,
+        });
+
+        try {
+          await db.transaction(async () => {
+            throw new Error('test');
+          });
+        } catch {
+          // ignore
+        }
+        expect(rollbackSpy).toHaveBeenCalledTimes(0);
+
+        await db.destroy();
+      });
     });
   });
 });
@@ -349,6 +400,38 @@ describe('Query builder pagination order stability (GH #26030)', () => {
     const lower = sql.toLowerCase();
 
     expect(lower).toContain('case when');
+    expect(lower).toContain('`t0`.`id` asc');
+    expect(lower.indexOf('case when')).toBeLessThan(lower.indexOf('`t0`.`id` asc'));
+
+    await dbWithStatus.destroy();
+  });
+
+  it('includes status CASE in SELECT and id tie-break when paginated with a join (DISTINCT)', async () => {
+    const dbWithStatus = new Database(paginationQueryBuilderConfig);
+    await dbWithStatus.init({ models: [articleWithStatusSortModel] });
+
+    const qb = createQueryBuilder(articleWithStatusSortModel.uid, dbWithStatus)
+      .join({
+        alias: 't1',
+        referencedTable: 'articles_authors_lnk',
+        referencedColumn: 'article_id',
+        rootColumn: 'id',
+        rootTable: 't0',
+      })
+      .init({
+        limit: 5,
+        offset: 0,
+        orderBy: { status: 'desc' },
+      })
+      .getKnexQuery();
+
+    const { sql } = qb.toSQL();
+    const lower = sql.toLowerCase();
+    const orderIdx = lower.indexOf(' order by ');
+    const beforeOrder = orderIdx >= 0 ? lower.slice(0, orderIdx) : lower;
+
+    expect(lower).toContain('distinct');
+    expect(beforeOrder).toContain('case when');
     expect(lower).toContain('`t0`.`id` asc');
     expect(lower.indexOf('case when')).toBeLessThan(lower.indexOf('`t0`.`id` asc'));
 
